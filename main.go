@@ -16,8 +16,11 @@ func proxy(c *fiber.Ctx) {
 	c.Accepts("application/json")
 	ret := proxyOnly(c.Params("*"), c)
 	var result map[string]interface{}
-	json.Unmarshal([]byte(ret.String()), &result)
-	log.Println(result)
+	json.Unmarshal(ret.Bytes(), &result)
+	if len(result) == 0 {
+		var result []map[string]interface{}
+		json.Unmarshal(ret.Bytes(), &result)
+	}
 	c.Status(200).JSON(result)
 }
 
