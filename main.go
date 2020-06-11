@@ -3,9 +3,12 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"strings"
 
 	"github.com/gofiber/fiber"
+	"github.com/imroc/req"
 )
 
 func main() {
@@ -68,5 +71,31 @@ func main() {
 		c.Status(404).Send("KO")
 	})
 
+	app.Post("/*", proxyRasa)
+
 	app.Listen("0.0.0.0:4000")
+}
+
+func proxyRasa(c *fiber.Ctx) {
+	c.Accepts("application/json")
+	ret := proxyOnly(c.Params("*"), c)
+	c.Status(200).JSON(ret.ToBytes)
+}
+
+func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
+
+	header := make(http.Header)
+
+	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
+		header.Set(string(key), string(value))
+	})
+
+	header.Set("X-Forwarded-Host", header.Get("Host"))
+
+	// fmt.Println(string(c.Fasthttp.Request.Body()))
+	r, err := req.Post("http://localhost:5005/"+target, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return r
 }
