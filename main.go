@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,9 +12,35 @@ import (
 	"github.com/imroc/req"
 )
 
+func proxy(c *fiber.Ctx) {
+	c.Accepts("application/json")
+	ret := proxyOnly(c.Params("*"), c)
+	var result map[string]interface{}
+	json.Unmarshal([]byte(ret.String()), &result)
+	c.Status(200).JSON(result)
+}
+
+func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
+
+	header := make(http.Header)
+
+	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
+		header.Set(string(key), string(value))
+	})
+
+	header.Set("X-Forwarded-Host", header.Get("Host"))
+
+	// fmt.Println(string(c.Fasthttp.Request.Body()))
+	r, err := req.Post("https://httpbin.org/"+target, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return r
+}
+
 func main() {
 
-	version := "chk-v0.0.1"
+	version := "chk-v0.0.6"
 
 	app := fiber.New()
 	app.Settings.ServerHeader = version
@@ -71,31 +98,7 @@ func main() {
 		c.Status(404).Send("KO")
 	})
 
-	app.Post("/*", proxyRasa)
+	app.Post("/*", proxy)
 
 	app.Listen("0.0.0.0:4000")
-}
-
-func proxyRasa(c *fiber.Ctx) {
-	c.Accepts("application/json")
-	ret := proxyOnly(c.Params("*"), c)
-	c.Status(200).JSON(ret.ToBytes)
-}
-
-func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
-
-	header := make(http.Header)
-
-	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
-		header.Set(string(key), string(value))
-	})
-
-	header.Set("X-Forwarded-Host", header.Get("Host"))
-
-	// fmt.Println(string(c.Fasthttp.Request.Body()))
-	r, err := req.Post("http://localhost:5005/"+target, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
-	if err != nil {
-		log.Fatal(err)
-	}
-	return r
 }

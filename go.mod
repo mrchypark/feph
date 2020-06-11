@@ -1,4 +1,4 @@
-module rasachk
+module chk
 
 go 1.14
 
