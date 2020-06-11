@@ -45,7 +45,7 @@ func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
 
 func main() {
 
-	version := "chk-v0.0.6"
+	version := "chk-v0.0.9"
 
 	app := fiber.New()
 	app.Settings.ServerHeader = version
