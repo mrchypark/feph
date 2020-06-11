@@ -17,6 +17,7 @@ func proxy(c *fiber.Ctx) {
 	ret := proxyOnly(c.Params("*"), c)
 	var result map[string]interface{}
 	json.Unmarshal([]byte(ret.String()), &result)
+	log.Println(result)
 	c.Status(200).JSON(result)
 }
 
@@ -30,6 +31,7 @@ func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
 
 	header.Set("X-Forwarded-Host", header.Get("Host"))
 
+	log.Println(target)
 	// fmt.Println(string(c.Fasthttp.Request.Body()))
 	r, err := req.Post("http://localhost:5005/"+target, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
 	if err != nil {
