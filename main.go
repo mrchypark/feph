@@ -31,7 +31,7 @@ func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
 	header.Set("X-Forwarded-Host", header.Get("Host"))
 
 	// fmt.Println(string(c.Fasthttp.Request.Body()))
-	r, err := req.Post("https://httpbin.org/"+target, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
+	r, err := req.Post("http://localhost:5005/"+target, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
 	if err != nil {
 		log.Fatal(err)
 	}
