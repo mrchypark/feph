@@ -62,7 +62,7 @@ func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 
 func main() {
 
-	version := "feph-v0.0.10"
+	version := "feph-v0.0.11"
 
 	rcfg := recover.Config{
 		Handler: func(c *fiber.Ctx, err error) {
