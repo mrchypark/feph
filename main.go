@@ -56,7 +56,7 @@ func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
 
 func main() {
 
-	version := "feph-v0.0.10"
+	version := "feph-v0.0.11"
 	checkDir := os.Getenv("CHECK_DIR")
 
 	app := fiber.New()
