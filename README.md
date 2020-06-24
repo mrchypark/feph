@@ -17,14 +17,14 @@ This project can use set Dockerfile like below.
 FROM debian
 ... 
 RUN apt-get update \
-    && wget https://gitreleases.dev/gh/mrchypark/azure-agic-readiness/latest/azure-agic-readiness-v0.0.10-linux-amd64.tar.gz \
-    && tar -zxvf azure-agic-readiness-v0.0.10-linux-amd64.tar.gz \
-    && rm azure-agic-readiness-v0.0.10-linux-amd64.tar.gz \
+    && wget https://gitreleases.dev/gh/mrchypark/feph/latest/feph-v0.0.11-linux-amd64.tar.gz \
+    && tar -zxvf feph-v0.0.11-linux-amd64.tar.gz \
+    && rm feph-v0.0.11-linux-amd64.tar.gz \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get purge -y --auto-remove
 ...
 ENTRYPOINT [""]
-CMD ["sh","-c","<User CMD> | ./azure-agic-readiness"]
+CMD ["sh","-c","<User CMD> | ./feph"]
 
 ```
 
