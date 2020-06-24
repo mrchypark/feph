@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber"
+	"github.com/gofiber/recover"
 	"github.com/imroc/req"
 	"github.com/subosito/gotenv"
 )
@@ -23,7 +24,15 @@ func init() {
 func proxy(c *fiber.Ctx) {
 	// for now, just json body support
 	c.Accepts("application/json")
-	ret := proxyOnly(c.Params("*"), c)
+	target := c.Params("*")
+
+	// request backend
+	ret, err := proxyOnly(target, c)
+	if err != nil {
+		c.Status(404).Send("Not Found : " + "/" + target)
+		return
+	}
+
 	// try unmarshal json object.
 	var result map[string]interface{}
 	json.Unmarshal(ret.Bytes(), &result)
@@ -37,7 +46,7 @@ func proxy(c *fiber.Ctx) {
 	c.Status(200).JSON(result)
 }
 
-func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
+func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 
 	header := make(http.Header)
 	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
@@ -48,18 +57,24 @@ func proxyOnly(target string, c *fiber.Ctx) *req.Resp {
 
 	r, err := req.Post("http://localhost:"+os.Getenv("TARGET_PORT")+"/"+target,
 		header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
-	if err != nil {
-		log.Fatal(err)
-	}
-	return r
+	return r, err
 }
 
 func main() {
 
 	version := "feph-v0.0.10"
+
+	rcfg := recover.Config{
+		Handler: func(c *fiber.Ctx, err error) {
+			c.SendString(err.Error())
+			c.SendStatus(500)
+		},
+	}
+
 	checkDir := os.Getenv("CHECK_DIR")
 
 	app := fiber.New()
+	app.Use(recover.New(rcfg))
 	app.Settings.ServerHeader = version
 
 	log.Println("Server start: " + version)
