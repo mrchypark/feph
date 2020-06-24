@@ -1,1 +1,94 @@
-# azure-agic-readiness
+# feph
+
+File Exist Probes Helper for Azure Application Gateway Ingress Controller on Kubernetes.
+
+## background
+
+Azure [AGIC](https://github.com/Azure/application-gateway-kubernetes-ingress)(Application Gateway Ingress Controller) on AKS(Azure Kubernetes Service) is only support httpGet probes now. This small binary is server to provide endpoint check wheather file is exist or not.
+
+## How to use
+
+### In Container
+
+This project can use set Dockerfile like below.
+
+```
+## Dockerfile
+FROM debian
+... 
+RUN apt-get update \
+    && wget https://gitreleases.dev/gh/mrchypark/azure-agic-readiness/latest/azure-agic-readiness-v0.0.10-linux-amd64.tar.gz \
+    && tar -zxvf azure-agic-readiness-v0.0.10-linux-amd64.tar.gz \
+    && rm azure-agic-readiness-v0.0.10-linux-amd64.tar.gz \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get purge -y --auto-remove
+...
+ENTRYPOINT [""]
+CMD ["sh","-c","<User CMD> | ./azure-agic-readiness"]
+
+```
+
+### Side Car Pattern
+
+TBD
+
+
+### Support Endpoint
+
+- ext
+```
+localhost:4000/ext/:ext
+```
+
+ext is extention name of file. If you want to check file what is named end of `.txt` is exist, you can set health check on deployment.yaml like below.
+
+```
+## deployment.yaml
+...
+  livenessProbe:
+    httpGet:
+      path: /ext/text
+      port: 4000
+    periodSeconds: 10
+    timeoutSeconds: 10
+...
+```
+
+- filename
+```
+localhost:4000/filename/:name
+```
+
+filename means full file name. you can use this endpoint like below.
+
+```
+## deployment.yaml
+...
+  livenessProbe:
+    httpGet:
+      path: /filename/checkfile.log
+      port: 4000
+    periodSeconds: 10
+    timeoutSeconds: 10
+...
+```
+
+
+- contain
+```
+localhost:4000/contain/:string
+```
+
+contain means contain query on file name. if you want to check file is exist that contain `logging` text on file name, you can use this endpoint like below.
+
+```
+## deployment.yaml
+...
+  livenessProbe:
+    httpGet:
+      path: /contain/logging
+      port: 4000
+    periodSeconds: 10
+    timeoutSeconds: 10
+...
+```
