@@ -20,7 +20,7 @@ TODO : sh -c |
 ## Dockerfile
 FROM debian
 ... 
-ARG FEPH_VER=v0.0.11
+ARG FEPH_VER=v0.0.12
 RUN apt-get update && apt-get install -y curl \
     && curl -L https://glare.now.sh/mrchypark/feph@{$FEPH_VER}/feph-{$FEPH_VER}-linux-amd64.tar.gz -o feph.tar.gz \
     && tar -zxvf feph.tar.gz \

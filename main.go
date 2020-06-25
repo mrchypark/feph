@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -54,9 +55,9 @@ func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 	})
 
 	header.Set("X-Forwarded-Host", header.Get("Host"))
-
-	r, err := req.Post("http://localhost:"+os.Getenv("TARGET_PORT")+"/"+target,
-		header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
+	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
+	log.Println(turl)
+	r, err := req.Post(turl, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
 	return r, err
 }
 
