@@ -3,12 +3,12 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/gofiber/fiber"
+	"github.com/gofiber/logger"
 	"github.com/gofiber/recover"
 	"github.com/imroc/req"
 	"github.com/subosito/gotenv"
@@ -71,13 +71,17 @@ func main() {
 		},
 	}
 
+	lcfg := logger.Config{
+		Format:     "${time} ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
+		TimeFormat: "2006-01-02T15:04:05-0700",
+	}
+
 	checkDir := os.Getenv("CHECK_DIR")
 
 	app := fiber.New()
 	app.Use(recover.New(rcfg))
+	app.Use(logger.New(lcfg))
 	app.Settings.ServerHeader = version
-
-	log.Println("Server start: " + version)
 
 	// healthz
 	app.Get("/", func(c *fiber.Ctx) {

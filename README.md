@@ -12,14 +12,16 @@ Azure [AGIC](https://github.com/Azure/application-gateway-kubernetes-ingress)(Ap
 
 This project can use set Dockerfile like below.
 
+TODO : sh -c | 
+
 ```
 ## Dockerfile
 FROM debian
 ... 
-RUN apt-get update \
-    && wget https://gitreleases.dev/gh/mrchypark/feph/latest/feph-v0.0.11-linux-amd64.tar.gz \
-    && tar -zxvf feph-v0.0.11-linux-amd64.tar.gz \
-    && rm feph-v0.0.11-linux-amd64.tar.gz \
+RUN apt-get update && apt-get install -y curl \
+    && curl -L https://glare.now.sh/mrchypark/feph@v0.0.11/feph-v0.0.11-linux-amd64.tar.gz -o feph.tar.gz \
+    && tar -zxvf feph.tar.gz \
+    && rm feph.tar.gz \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get purge -y --auto-remove
 ...
@@ -31,7 +33,6 @@ CMD ["sh","-c","<User CMD> | ./feph"]
 ### Side Car Pattern
 
 TBD
-
 
 ### Support Endpoint
 

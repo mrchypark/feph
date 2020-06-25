@@ -21,6 +21,11 @@ GET http://localhost:4000/contin/mode
 
 ### expect return OK with erroer endpoint
 POST http://localhost:4000/contin/mode
+
+{
+    "test" : "test"
+}
+
 ### expect return OK with erroer endpoint
 PUT http://localhost:4000/contin/mode
 ### expect return OK with erroer endpoint
