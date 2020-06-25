@@ -17,8 +17,8 @@ import (
 func init() {
 	// Set defualt env value
 	gotenv.Apply(strings.NewReader("FEPH_PORT=4000"))
-	gotenv.Apply(strings.NewReader("TARGET_PORT=5000"))
-	gotenv.Apply(strings.NewReader("CHECK_DIR=."))
+	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
+	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
 }
 
 func proxy(c *fiber.Ctx) {
@@ -85,7 +85,7 @@ func main() {
 
 	// healthz
 	app.Get("/", func(c *fiber.Ctx) {
-		c.SendStatus(200)
+		c.Status(200).Send(version)
 	})
 
 	app.Get("/ext/:ext", func(c *fiber.Ctx) {
