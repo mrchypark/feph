@@ -2,7 +2,6 @@ package main
 
 import (
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -25,32 +24,28 @@ func init() {
 }
 
 func bodyReturn(ret *req.Resp, c *fiber.Ctx) {
-	log.Println(ret.String())
-	// try unmarshal json object.
-	var result map[string]interface{}
-	err := json.Unmarshal(ret.Bytes(), &result)
-	if err != nil {
-		c.Status(200).JSON(ret.String())
-		return
-	} else if len(result) == 0 {
-		var result []map[string]interface{}
-		json.Unmarshal(ret.Bytes(), &result)
-		log.Println(result)
+	var resultList []map[string]interface{}
+	if err := json.Unmarshal(ret.Bytes(), &resultList); err != nil {
+		var result map[string]interface{}
+		if err := json.Unmarshal(ret.Bytes(), &result); err != nil {
+			c.Status(200).JSON(ret.String())
+			return
+		}
 		c.Status(200).JSON(result)
 		return
 	}
-	c.Status(200).JSON(result)
+	c.Status(200).JSON(resultList)
 }
 
 func proxyGet(c *fiber.Ctx) {
 	target := c.Params("*")
 	// request backend
 	ret, err := proxyOnly(target, c)
-	if strings.Contains(ret.String(), "Cannot") {
-		c.Status(404).Send(ret.String())
-		return
-	} else if err != nil {
+	if err != nil {
 		c.Status(404).Send("Not Found : " + "/" + target)
+		return
+	} else if strings.Contains(ret.String(), "Cannot") {
+		c.Status(404).Send(ret.String())
 		return
 	}
 	bodyReturn(ret, c)
@@ -79,7 +74,6 @@ func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 
 	header.Set("X-Forwarded-Host", header.Get("Host"))
 	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
-	log.Println(turl)
 	r, err := req.Get(turl, header)
 	return r, err
 }
@@ -93,24 +87,19 @@ func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
 
 	header.Set("X-Forwarded-Host", header.Get("Host"))
 	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
-	log.Println(turl)
 	r, err := req.Post(turl, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
 	return r, err
 }
 
 func main() {
 
-	version := "feph-v0.0.13"
-	log.Println("FEPH_PORT: " + os.Getenv("FEPH_PORT"))
-	log.Println("TARGET_PORT: " + os.Getenv("TARGET_PORT"))
-	log.Println("CHECK_DIR: " + os.Getenv("CHECK_DIR"))
+	version := "feph-v0.0.14"
+	checkDir := os.Getenv("CHECK_DIR")
 
 	lcfg := logger.Config{
-		Format:     "${time} feph ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
+		Format:     "${time} feph ${method} ${path} - ${status} - ${latency}\nRequest : ${body}\n",
 		TimeFormat: "2006-01-02T15:04:05-0700",
 	}
-
-	checkDir := os.Getenv("CHECK_DIR")
 
 	app := fiber.New()
 	app.Use(middleware.Recover())

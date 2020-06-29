@@ -12,22 +12,38 @@ This project can use set Dockerfile like below.
 
 p.s Thank you for wonderful project [glare](https://github.com/Contextualist/glare).
 
-TODO : sh -c | 
-
 ```
 ## Dockerfile
 FROM debian
-... 
-ARG FEPH_VER=v0.0.12
+
+...  ## any of your code
+
+ARG FEPH_VER=v0.0.14
+ENV FEPH_PORT=4000
+ENV TARGET_PORT=3000
+ENV CHECK_DIR=./
 RUN apt-get update && apt-get install -y curl \
     && curl -L https://glare.now.sh/mrchypark/feph@{$FEPH_VER}/feph-{$FEPH_VER}-linux-amd64.tar.gz -o feph.tar.gz \
     && tar -zxvf feph.tar.gz \
     && rm feph.tar.gz \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get purge -y --auto-remove
-...
+
+...  ## any of your code
+
 ENTRYPOINT [""]
 CMD ["sh","-c","<User CMD> | ./feph"]
+
+```
+
+### Env
+
+feph has default env like below.
+
+```
+ENV FEPH_PORT=4000
+ENV TARGET_PORT=5005
+ENV CHECK_DIR=./
 
 ```
 

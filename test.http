@@ -38,9 +38,19 @@ GET http://localhost:4000/
 GET http://localhost:4000/helloGet
 
 ### 
+GET http://localhost:4000/text
+### 
 GET http://localhost:4000/con/test
 ###
 POST http://localhost:4000/helloPost
+Content-Type: application/json
+
+{
+    "test" : "test"
+}
+
+###
+POST http://localhost:4000/helloPostList
 Content-Type: application/json
 
 {
