@@ -1,21 +1,29 @@
 package main
 
 import (
-	"log"
-
 	"github.com/gofiber/fiber"
+	"github.com/gofiber/logger"
 )
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
+	lcfg := logger.Config{
+		Format:     "${time} example! ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
+		TimeFormat: "2006-01-02T15:04:05-0700",
+	}
+
+	app.Use(logger.New(lcfg))
 	// Routes
-	app.Get("/hello", hello)
+	app.Post("/helloPost", hello)
+	app.Get("/helloGet", hello)
 	// Start server
-	log.Fatal(app.Listen(3000))
+	app.Listen(3000)
 }
 
 // Handler
 func hello(c *fiber.Ctx) {
-	c.Send("Hello, World 👋!")
+	c.JSON(fiber.Map{
+    "return": "Hello, World 👋!",
+    })
 }

@@ -8,8 +8,6 @@ Azure [AGIC](https://github.com/Azure/application-gateway-kubernetes-ingress)(Ap
 
 ## How to use
 
-### In Container
-
 This project can use set Dockerfile like below. 
 
 p.s Thank you for wonderful project [glare](https://github.com/Contextualist/glare).
@@ -32,10 +30,6 @@ ENTRYPOINT [""]
 CMD ["sh","-c","<User CMD> | ./feph"]
 
 ```
-
-### Side Car Pattern
-
-TBD
 
 ### Support Endpoint
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -9,11 +8,14 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/middleware"
 	"github.com/gofiber/logger"
-	"github.com/gofiber/recover"
 	"github.com/imroc/req"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/subosito/gotenv"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func init() {
 	// Set defualt env value
@@ -22,32 +24,67 @@ func init() {
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
 }
 
-func proxy(c *fiber.Ctx) {
-	// for now, just json body support
-	c.Accepts("application/json")
-	target := c.Params("*")
-
-	// request backend
-	ret, err := proxyOnly(target, c)
-	if err != nil {
-		c.Status(404).Send("Not Found : " + "/" + target)
-		return
-	}
-
+func bodyReturn(ret *req.Resp, c *fiber.Ctx) {
+	log.Println(ret.String())
 	// try unmarshal json object.
 	var result map[string]interface{}
-	json.Unmarshal(ret.Bytes(), &result)
-	if len(result) == 0 {
-		// try unmarshal json array.
+	err := json.Unmarshal(ret.Bytes(), &result)
+	if err != nil {
+		c.Status(200).JSON(ret.String())
+		return
+	} else if len(result) == 0 {
 		var result []map[string]interface{}
 		json.Unmarshal(ret.Bytes(), &result)
+		log.Println(result)
 		c.Status(200).JSON(result)
 		return
 	}
 	c.Status(200).JSON(result)
 }
 
+func proxyGet(c *fiber.Ctx) {
+	target := c.Params("*")
+	// request backend
+	ret, err := proxyOnly(target, c)
+	if strings.Contains(ret.String(), "Cannot") {
+		c.Status(404).Send(ret.String())
+		return
+	} else if err != nil {
+		c.Status(404).Send("Not Found : " + "/" + target)
+		return
+	}
+	bodyReturn(ret, c)
+}
+
+func proxyPost(c *fiber.Ctx) {
+
+	target := c.Params("*")
+	// request backend
+	ret, err := proxyWithBody(target, c)
+	if strings.Contains(ret.String(), "Cannot") {
+		c.Status(404).Send(ret.String())
+		return
+	} else if err != nil {
+		c.Status(404).Send("Not Found : " + "/" + target)
+		return
+	}
+	bodyReturn(ret, c)
+}
+
 func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
+	header := make(http.Header)
+	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
+		header.Set(string(key), string(value))
+	})
+
+	header.Set("X-Forwarded-Host", header.Get("Host"))
+	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
+	log.Println(turl)
+	r, err := req.Get(turl, header)
+	return r, err
+}
+
+func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
 
 	header := make(http.Header)
 	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
@@ -63,24 +100,20 @@ func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 
 func main() {
 
-	version := "feph-v0.0.11"
-
-	rcfg := recover.Config{
-		Handler: func(c *fiber.Ctx, err error) {
-			c.SendString(err.Error())
-			c.SendStatus(500)
-		},
-	}
+	version := "feph-v0.0.13"
+	log.Println("FEPH_PORT: " + os.Getenv("FEPH_PORT"))
+	log.Println("TARGET_PORT: " + os.Getenv("TARGET_PORT"))
+	log.Println("CHECK_DIR: " + os.Getenv("CHECK_DIR"))
 
 	lcfg := logger.Config{
-		Format:     "${time} ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
+		Format:     "${time} feph ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
 		TimeFormat: "2006-01-02T15:04:05-0700",
 	}
 
 	checkDir := os.Getenv("CHECK_DIR")
 
 	app := fiber.New()
-	app.Use(recover.New(rcfg))
+	app.Use(middleware.Recover())
 	app.Use(logger.New(lcfg))
 	app.Settings.ServerHeader = version
 
@@ -138,7 +171,8 @@ func main() {
 		return
 	})
 
-	app.All("/*", proxy)
+	app.Get("/*", proxyGet)
+	app.Post("/*", proxyPost)
 
 	app.Listen(os.Getenv("FEPH_PORT"))
 }
