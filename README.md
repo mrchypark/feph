@@ -18,10 +18,12 @@ FROM debian
 
 ...  ## any of your code
 
-ARG FEPH_VER=v0.0.14
+ARG FEPH_VER=v0.0.15
 ENV FEPH_PORT=4000
 ENV TARGET_PORT=3000
 ENV CHECK_DIR=./
+ENV LOG_404=true
+
 RUN apt-get update && apt-get install -y curl \
     && curl -L https://glare.now.sh/mrchypark/feph@{$FEPH_VER}/feph-{$FEPH_VER}-linux-amd64.tar.gz -o feph.tar.gz \
     && tar -zxvf feph.tar.gz \
@@ -44,6 +46,7 @@ feph has default env like below.
 ENV FEPH_PORT=4000
 ENV TARGET_PORT=5005
 ENV CHECK_DIR=./
+ENV LOG_404=true
 
 ```
 
