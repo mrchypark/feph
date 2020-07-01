@@ -18,5 +18,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-w -s' -o example main.go
 ENV FEPH_PORT=4000
 ENV TARGET_PORT=3005
 ENV CHECK_DIR=./
+ENV LOG_ALL_OR_ONLY_404=false
 
 CMD ["sh","-c","./example | ./feph"]

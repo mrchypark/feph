@@ -1,14 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber"
 	"github.com/gofiber/fiber/middleware"
-	"github.com/gofiber/logger"
 	"github.com/imroc/req"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/subosito/gotenv"
@@ -21,6 +24,7 @@ func init() {
 	gotenv.Apply(strings.NewReader("FEPH_PORT=4000"))
 	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
+	gotenv.Apply(strings.NewReader("LOG_404=true"))
 }
 
 func bodyReturn(ret *req.Resp, c *fiber.Ctx) {
@@ -91,19 +95,43 @@ func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
 	return r, err
 }
 
+type logWriter struct {
+}
+
+func (writer logWriter) Write(bytes []byte) (int, error) {
+	return fmt.Print(time.Now().UTC().Format("2006-01-02T15:04:05-0700 ") + string(bytes))
+}
+
+// "${time} ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
+
+func logs(c *fiber.Ctx) {
+	log.Println(c.Method() + " " + c.Path() + "\t" + strconv.Itoa(c.Fasthttp.Response.StatusCode()))
+}
+
+func ok(state int, l404 bool, c *fiber.Ctx) {
+	if state == 200 {
+		c.Status(state).Send("OK")
+		return
+	} else {
+		c.Status(state).Send("KO")
+		if l404 {
+			logs(c)
+		}
+		return
+	}
+}
+
 func main() {
 
-	version := "feph-v0.0.14"
+	version := "feph-v0.0.15"
 	checkDir := os.Getenv("CHECK_DIR")
+	l404, _ := strconv.ParseBool(os.Getenv("LOG_404"))
 
-	lcfg := logger.Config{
-		Format:     "${time} feph ${method} ${path} - ${status} - ${latency}\nRequest : ${body}\n",
-		TimeFormat: "2006-01-02T15:04:05-0700",
-	}
+	log.SetFlags(0)
+	log.SetOutput(new(logWriter))
 
 	app := fiber.New()
 	app.Use(middleware.Recover())
-	app.Use(logger.New(lcfg))
 	app.Settings.ServerHeader = version
 
 	// healthz
@@ -114,50 +142,41 @@ func main() {
 	app.Get("/ext/:ext", func(c *fiber.Ctx) {
 		files, err := ioutil.ReadDir(checkDir)
 		if err != nil {
-			c.Status(404).Send("KO")
-			return
+			ok(404, l404, c)
 		}
 		for _, file := range files {
 			tem := strings.Split(file.Name(), ".")
 			if tem[len(tem)-1] == c.Params("ext") {
-				c.Status(200).Send("OK")
-				return
+				ok(200, l404, c)
 			}
 		}
-		c.Status(404).Send("KO")
-		return
+		ok(404, l404, c)
 	})
 
 	app.Get("/filename/:name", func(c *fiber.Ctx) {
 		files, err := ioutil.ReadDir(checkDir)
 		if err != nil {
-			c.Status(404).Send("KO")
-			return
+			ok(404, l404, c)
 		}
 		for _, file := range files {
 			if file.Name() == c.Params("name") {
-				c.Status(200).Send("OK")
-				return
+				ok(200, l404, c)
 			}
 		}
-		c.Status(404).Send("KO")
-		return
+		ok(404, l404, c)
 	})
 
 	app.Get("/contain/:string", func(c *fiber.Ctx) {
 		files, err := ioutil.ReadDir(checkDir)
 		if err != nil {
-			c.Status(404).Send("KO")
-			return
+			ok(404, l404, c)
 		}
 		for _, file := range files {
 			if strings.Contains(file.Name(), c.Params("string")) {
-				c.Status(200).Send("OK")
-				return
+				ok(200, l404, c)
 			}
 		}
-		c.Status(404).Send("KO")
-		return
+		ok(404, l404, c)
 	})
 
 	app.Get("/*", proxyGet)

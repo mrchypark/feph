@@ -2,18 +2,17 @@ package main
 
 import (
 	"github.com/gofiber/fiber"
-	"github.com/gofiber/logger"
+	"github.com/gofiber/fiber/middleware"
 )
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
-	lcfg := logger.Config{
-		Format:     "${time} example! ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
-		TimeFormat: "2006-01-02T15:04:05-0700",
-	}
 
-	app.Use(logger.New(lcfg))
+	app.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format:     "${time} example log ${method} ${path} - ${status} - ${latency}\nRequest : ${body}\n",
+		TimeFormat: "2006-01-02T15:04:05-0700",
+	}))
 	// Routes
 	app.Post("/helloPostList", helloList)
 	app.Post("/helloPost", hello)
@@ -26,8 +25,8 @@ func main() {
 // Handler
 func hello(c *fiber.Ctx) {
 	c.JSON(fiber.Map{
-    "return": "Hello, World 👋!",
-    })
+		"return": "Hello, World 👋!",
+	})
 }
 
 // Handler
