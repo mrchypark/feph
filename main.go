@@ -123,7 +123,7 @@ func ok(state int, l404 bool, c *fiber.Ctx) {
 
 func main() {
 
-	version := "feph-v0.0.16"
+	version := "feph-v0.0.17-rc2"
 	checkDir := os.Getenv("CHECK_DIR")
 	l404, _ := strconv.ParseBool(os.Getenv("LOG_404"))
 
