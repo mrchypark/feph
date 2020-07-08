@@ -138,6 +138,10 @@ func main() {
 	app.Get("/", func(c *fiber.Ctx) {
 		c.Status(200).Send(version)
 	})
+	
+	app.Get("/hostname", func(c *fiber.Ctx) {
+		c.Status(200).Send(os.Getenv("HOSTNAME"))
+	}
 
 	app.Get("/ext/:ext", func(c *fiber.Ctx) {
 		files, err := ioutil.ReadDir(checkDir)
