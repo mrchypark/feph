@@ -1,0 +1,20 @@
+### default
+GET http://localhost:3000/text
+###
+POST http://localhost:3000/helloPost
+Content-Type: application/json
+
+{
+    "test" : "test"
+}
+
+###
+POST http://localhost:3000/helloPostList
+Content-Type: application/json
+
+{
+    "test" : "test"
+}
+
+### 
+GET http://localhost:3000/helloGet

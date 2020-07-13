@@ -1,30 +1,153 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber"
 	"github.com/gofiber/fiber/middleware"
 	"github.com/imroc/req"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/subosito/gotenv"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func init() {
 	// Set defualt env value
 	gotenv.Apply(strings.NewReader("FEPH_PORT=4000"))
 	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
-	gotenv.Apply(strings.NewReader("LOG_404=true"))
+	gotenv.Apply(strings.NewReader("LOG_LEVEL=1"))
+}
+
+func main() {
+
+	version := "feph-v0.0.17"
+	checkDir := os.Getenv("CHECK_DIR")
+	switch os.Getenv("LOG_LEVEL") {
+	case "5":
+		zerolog.SetGlobalLevel(zerolog.PanicLevel)
+	case "4":
+		zerolog.SetGlobalLevel(zerolog.FatalLevel)
+	case "3":
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	case "2":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "1":
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case "0":
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	case "-1":
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
+
+	app := fiber.New()
+	app.Use(middleware.Recover())
+	app.Settings.ServerHeader = version
+	app.Settings.StrictRouting = true
+	app.Settings.CaseSensitive = true
+
+	// healthz
+	app.Get("/", func(c *fiber.Ctx) {
+		c.Status(200).Send(version)
+		debug(c)
+	})
+
+	app.Get("/hostname", func(c *fiber.Ctx) {
+		c.Status(200).Send(os.Getenv("HOSTNAME"))
+		debug(c)
+	})
+
+	app.Get("/ext/:ext", func(c *fiber.Ctx) {
+		files, err := ioutil.ReadDir(checkDir)
+		if err != nil {
+			c.Status(404).Send("KO")
+			info(c)
+		} else {
+			chk := false
+			for _, file := range files {
+				tem := strings.Split(file.Name(), ".")
+				if tem[len(tem)-1] == c.Params("ext") {
+					chk = true
+				}
+			}
+			if chk {
+				c.Status(200).Send("OK")
+				debug(c)
+			} else {
+				c.Status(404).Send("KO")
+				info(c)
+			}
+		}
+	})
+
+	app.Get("/filename/:name", func(c *fiber.Ctx) {
+		files, err := ioutil.ReadDir(checkDir)
+		if err != nil {
+			c.Status(404).Send("KO")
+			info(c)
+		} else {
+			chk := false
+			for _, file := range files {
+				if file.Name() == c.Params("name") {
+					chk = true
+				}
+			}
+			if chk {
+				c.Status(200).Send("OK")
+				debug(c)
+			} else {
+				c.Status(404).Send("KO")
+				info(c)
+			}
+		}
+	})
+
+	app.Get("/contain/:string", func(c *fiber.Ctx) {
+		files, err := ioutil.ReadDir(checkDir)
+		if err != nil {
+			c.Status(404).Send("KO")
+			info(c)
+		} else {
+			chk := false
+			for _, file := range files {
+				if strings.Contains(file.Name(), c.Params("string")) {
+					chk = true
+				}
+			}
+			if chk {
+				c.Status(200).Send("OK")
+				debug(c)
+			} else {
+				c.Status(404).Send("KO")
+				info(c)
+			}
+		}
+	})
+
+	app.All("/*", proxys)
+
+	app.Listen(os.Getenv("FEPH_PORT"))
+}
+
+func info(c *fiber.Ctx) {
+	log.Info().Str("path", c.Path()).
+		Str("method", c.Method()).
+		Str("status", strconv.Itoa(c.Fasthttp.Response.StatusCode())).
+		Str("system", "feph").
+		Send()
+}
+
+func debug(c *fiber.Ctx) {
+	log.Debug().Str("path", c.Path()).
+		Str("method", c.Method()).
+		Str("status", strconv.Itoa(c.Fasthttp.Response.StatusCode())).
+		Str("system", "feph").
+		Send()
 }
 
 func bodyReturn(ret *req.Resp, c *fiber.Ctx) {
@@ -33,41 +156,52 @@ func bodyReturn(ret *req.Resp, c *fiber.Ctx) {
 		var result map[string]interface{}
 		if err := json.Unmarshal(ret.Bytes(), &result); err != nil {
 			c.Status(200).JSON(ret.String())
-			return
+			debug(c)
+		} else {
+			c.Status(200).JSON(result)
+			debug(c)
 		}
-		c.Status(200).JSON(result)
-		return
+	} else {
+		c.Status(200).JSON(resultList)
+		debug(c)
 	}
-	c.Status(200).JSON(resultList)
+}
+
+func proxys(c *fiber.Ctx) {
+	if len(c.Body()) > 0 {
+		proxyPost(c)
+	} else {
+		proxyGet(c)
+	}
 }
 
 func proxyGet(c *fiber.Ctx) {
 	target := c.Params("*")
-	// request backend
 	ret, err := proxyOnly(target, c)
 	if err != nil {
-		c.Status(404).Send("Not Found : " + "/" + target)
-		return
+		c.Status(404).Send("Not Found : " + c.Method() + " /" + target)
+		info(c)
 	} else if strings.Contains(ret.String(), "Cannot") {
 		c.Status(404).Send(ret.String())
-		return
+		info(c)
+	} else {
+		bodyReturn(ret, c)
 	}
-	bodyReturn(ret, c)
 }
 
 func proxyPost(c *fiber.Ctx) {
-
 	target := c.Params("*")
-	// request backend
 	ret, err := proxyWithBody(target, c)
-	if strings.Contains(ret.String(), "Cannot") {
+	if err != nil {
+		c.Status(404).Send("Not Found : " + c.Method() + " /" + target)
+		info(c)
+	} else if strings.Contains(ret.String(), "Cannot") {
 		c.Status(404).Send(ret.String())
-		return
-	} else if err != nil {
-		c.Status(404).Send("Not Found : " + "/" + target)
-		return
+		info(c)
+
+	} else {
+		bodyReturn(ret, c)
 	}
-	bodyReturn(ret, c)
 }
 
 func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
@@ -75,7 +209,6 @@ func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
 		header.Set(string(key), string(value))
 	})
-
 	header.Set("X-Forwarded-Host", header.Get("Host"))
 	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
 	r, err := req.Get(turl, header)
@@ -83,7 +216,6 @@ func proxyOnly(target string, c *fiber.Ctx) (*req.Resp, error) {
 }
 
 func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
-
 	header := make(http.Header)
 	c.Fasthttp.Request.Header.VisitAll(func(key, value []byte) {
 		header.Set(string(key), string(value))
@@ -93,98 +225,4 @@ func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
 	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
 	r, err := req.Post(turl, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
 	return r, err
-}
-
-type logWriter struct {
-}
-
-func (writer logWriter) Write(bytes []byte) (int, error) {
-	return fmt.Print(time.Now().UTC().Format("2006-01-02T15:04:05-0700 ") + string(bytes))
-}
-
-// "${time} ${method} ${path} - ${status} - ${latency}\nRequest :\n${body}\n",
-
-func logs(c *fiber.Ctx) {
-	log.Println(c.Method() + " " + c.Path() + "\t" + strconv.Itoa(c.Fasthttp.Response.StatusCode()))
-}
-
-func ok(state int, l404 bool, c *fiber.Ctx) {
-	if state == 200 {
-		c.Status(state).Send("OK")
-		return
-	} else {
-		c.Status(state).Send("KO")
-		if l404 {
-			logs(c)
-		}
-		return
-	}
-}
-
-func main() {
-
-	version := "feph-v0.0.17-rc2"
-	checkDir := os.Getenv("CHECK_DIR")
-	l404, _ := strconv.ParseBool(os.Getenv("LOG_404"))
-
-	log.SetFlags(0)
-	log.SetOutput(new(logWriter))
-
-	app := fiber.New()
-	app.Use(middleware.Recover())
-	app.Settings.ServerHeader = version
-
-	// healthz
-	app.Get("/", func(c *fiber.Ctx) {
-		c.Status(200).Send(version)
-	})
-	
-	app.Get("/hostname", func(c *fiber.Ctx) {
-		c.Status(200).Send(os.Getenv("HOSTNAME"))
-	})
-
-	app.Get("/ext/:ext", func(c *fiber.Ctx) {
-		files, err := ioutil.ReadDir(checkDir)
-		if err != nil {
-			ok(404, l404, c)
-		}
-		for _, file := range files {
-			tem := strings.Split(file.Name(), ".")
-			if tem[len(tem)-1] == c.Params("ext") {
-				ok(200, l404, c)
-			}
-		}
-		ok(404, l404, c)
-	})
-
-	app.Get("/filename/:name", func(c *fiber.Ctx) {
-		files, err := ioutil.ReadDir(checkDir)
-		if err != nil {
-			ok(404, l404, c)
-		}
-		for _, file := range files {
-			if file.Name() == c.Params("name") {
-				ok(200, l404, c)
-			}
-		}
-		ok(404, l404, c)
-	})
-
-	app.Get("/contain/:string", func(c *fiber.Ctx) {
-		files, err := ioutil.ReadDir(checkDir)
-		if err != nil {
-			ok(404, l404, c)
-		}
-		for _, file := range files {
-			if strings.Contains(file.Name(), c.Params("string")) {
-				ok(200, l404, c)
-			}
-		}
-		ok(404, l404, c)
-	})
-
-	app.Get("/*", proxyGet)
-	app.Post("/*", proxyPost)
-
-	app.Listen(os.Getenv("FEPH_PORT"))
 }

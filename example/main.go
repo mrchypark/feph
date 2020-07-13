@@ -2,17 +2,11 @@ package main
 
 import (
 	"github.com/gofiber/fiber"
-	"github.com/gofiber/fiber/middleware"
 )
 
 func main() {
 	// Fiber instance
 	app := fiber.New()
-
-	app.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format:     "${time} example log ${method} ${path} - ${status} - ${latency}\nRequest : ${body}\n",
-		TimeFormat: "2006-01-02T15:04:05-0700",
-	}))
 	// Routes
 	app.Post("/helloPostList", helloList)
 	app.Post("/helloPost", hello)
