@@ -1,0 +1,33 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: feph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: feph
+  template:
+    metadata:
+      labels:
+        app: feph 
+    spec:
+      containers:
+        - name: feph 
+          image: acrcommbot.azurecr.io/feph
+          ports:
+          - containerPort: 4000
+          env:
+            - name: INNER_HEALTH
+              value: "true"
+            - name: HEALTH_PATH
+              value: "/time"
+          livenessProbe:
+            httpGet:
+              # "host"가 정의되지 않은 경우, "PodIP" 가 사용될 것이다.
+              # host: my-host
+              # "scheme"이 정의되지 않은 경우, "HTTP" 스키마가 사용될 것이다. "HTTP"와 "HTTPS"만 허용된다.
+              # scheme: HTTPS
+              path: /healthz
+              port: 4000
+            timeoutSeconds: 1

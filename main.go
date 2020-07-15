@@ -5,8 +5,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"syscall"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber"
 	"github.com/gofiber/fiber/middleware"
@@ -22,9 +24,21 @@ func init() {
 	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
 	gotenv.Apply(strings.NewReader("LOG_LEVEL=1"))
+	gotenv.Apply(strings.NewReader("INNER_HEALTH=false"))
+	gotenv.Apply(strings.NewReader("HEALTH_PATH=/healthz"))
+	gotenv.Apply(strings.NewReader("HEALTH_METHOD=get"))
+	gotenv.Apply(strings.NewReader("HEALTH_BODY="))
+	gotenv.Apply(strings.NewReader("HEALTH_TYPE_INIT_DELAOY_SECONDS=0"))
+	gotenv.Apply(strings.NewReader("HEALTH_TYPE_PERIOD_SECONDS=1"))
 }
 
 func main() {
+
+	h, _ := strconv.ParseBool(os.Getenv("INNER_HEALTH"))
+	if h {
+		log.Info().Msg("health check run")
+		go healthz()
+	}
 
 	version := "feph-v0.0.17"
 	checkDir := os.Getenv("CHECK_DIR")
@@ -54,11 +68,6 @@ func main() {
 	// healthz
 	app.Get("/", func(c *fiber.Ctx) {
 		c.Status(200).Send(version)
-		debug(c)
-	})
-
-	app.Get("/hostname", func(c *fiber.Ctx) {
-		c.Status(200).Send(os.Getenv("HOSTNAME"))
 		debug(c)
 	})
 
@@ -132,6 +141,7 @@ func main() {
 	app.All("/*", proxys)
 
 	app.Listen(os.Getenv("FEPH_PORT"))
+
 }
 
 func info(c *fiber.Ctx) {
@@ -225,4 +235,46 @@ func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
 	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + "/" + target
 	r, err := req.Post(turl, header, req.BodyJSON(string(c.Fasthttp.Request.Body())))
 	return r, err
+}
+
+func healthz() {
+	t, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_INIT_DELAOY_SECONDS"))
+	time.Sleep(time.Duration(t) * time.Second)
+	for true {
+		check()
+		t, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_PERIOD_SECONDS"))
+		time.Sleep(time.Duration(t) * time.Second)
+	}
+}
+
+// kubectl exec POD_NAME -c CONTAINER_NAME /sbin/killall5
+
+func check() {
+	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + os.Getenv("HEALTH_PATH")
+	log.Info().Str("path", turl).Str("method",os.Getenv("HEALTH_METHOD")).Msg("chk")
+	timeout, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_PERIOD_SECONDS"))
+	req.SetTimeout(time.Duration(timeout) * time.Second)
+	switch os.Getenv("HEALTH_METHOD") {
+	case "get":
+		tem, err := req.Get(turl)
+		if err != nil {
+			log.Info().Msg("kill")
+			kill()
+		}
+		log.Info().Str("path", turl).Str("return", tem.String()).Send()
+	case "post":
+		b := os.Getenv("HEALTH_BODY")
+		_, err := req.Post(turl, req.BodyJSON(&b))
+		if err != nil {
+			log.Info().Msg("kill")
+			kill()
+		}
+	default:
+	
+	}
+}
+// https://pracucci.com/graceful-shutdown-of-kubernetes-pods.html
+func kill() {
+	log.Info().Str("timeout", os.Getenv("HEALTH_TYPE_PERIOD_SECONDS")).Send()
+	syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 }
