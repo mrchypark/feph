@@ -24,12 +24,15 @@ func init() {
 	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
 	gotenv.Apply(strings.NewReader("LOG_LEVEL=1"))
-	gotenv.Apply(strings.NewReader("INNER_HEALTH=false"))
-	gotenv.Apply(strings.NewReader("HEALTH_PATH=/healthz"))
-	gotenv.Apply(strings.NewReader("HEALTH_METHOD=get"))
-	gotenv.Apply(strings.NewReader("HEALTH_BODY="))
-	gotenv.Apply(strings.NewReader("HEALTH_TYPE_INIT_DELAOY_SECONDS=0"))
-	gotenv.Apply(strings.NewReader("HEALTH_TYPE_PERIOD_SECONDS=1"))
+	gotenv.Apply(strings.NewReader("TIMEOUT_RESTART=false"))
+	gotenv.Apply(strings.NewReader("TRS_PATH=/healthz"))
+	gotenv.Apply(strings.NewReader("TRS_METHOD=get"))
+	gotenv.Apply(strings.NewReader("TRS_BODY_KEY="))
+	gotenv.Apply(strings.NewReader("TRS_BODY_VALUE="))
+	gotenv.Apply(strings.NewReader("TRS_HEADER_KEY="))
+	gotenv.Apply(strings.NewReader("TRS_HEADER_VALUE="))
+	gotenv.Apply(strings.NewReader("TRS_TYPE_INIT_DELAOY_SECONDS=0"))
+	gotenv.Apply(strings.NewReader("TRS_TYPE_PERIOD_SECONDS=1"))
 }
 
 func main() {
@@ -277,4 +280,33 @@ func check() {
 func kill() {
 	log.Info().Str("timeout", os.Getenv("HEALTH_TYPE_PERIOD_SECONDS")).Send()
 	syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+}
+
+func (h *headers) getFromEnv() {
+	for _, e := range os.Environ() {
+		pair := strings.Split(e, "=")
+		matched,_:= regexp.MatchString("TRS_HEADER_KEY", pair[0])
+		if matched {
+			v := strings.Replace(pair[0], "TRS_HEADER_KEY", "TRS_HEADER_VALUE", 1)
+			if v == "" {
+				log.Warn().
+					Str("env","header").
+					Str("header key name", pair[0]).
+					Str("TRS_HEADER_VALUE", v).
+					Msg("found key but value env not exist.")
+			}
+			k := header{
+				key: pair[1]
+				value: os.Getenv(v)
+			}
+		}
+		
+	}
+}
+
+type headers []header
+
+type header struct {
+	key string
+	value string
 }
