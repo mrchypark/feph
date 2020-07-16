@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber"
 )
 
@@ -12,6 +14,7 @@ func main() {
 	app.Post("/helloPost", hello)
 	app.Get("/helloGet", hello)
 	app.Get("/text", text)
+	app.Get("/time", times)
 	// Start server
 	app.Listen(3000)
 }
@@ -29,6 +32,11 @@ func helloList(c *fiber.Ctx) {
 	list = append(list, fiber.Map{"return": "Hello, World 👋!"})
 	list = append(list, fiber.Map{"return": "Hello, World 👋!"})
 	c.JSON(list)
+}
+
+func times(c *fiber.Ctx) {
+	time.Sleep(30 * time.Second)
+	c.Send("Hello, World 👋!")
 }
 
 // Handler

@@ -1,0 +1,11 @@
+apiVersion: skaffold/v2beta5
+kind: Config
+metadata:
+  name: feph
+build:
+  artifacts:
+  - image: acrcommbot.azurecr.io/feph
+deploy:
+  kubectl:
+    manifests:
+    - tes.yml
