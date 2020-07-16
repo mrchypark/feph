@@ -5,9 +5,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"syscall"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber"
@@ -254,7 +255,7 @@ func healthz() {
 
 func check() {
 	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + os.Getenv("HEALTH_PATH")
-	log.Info().Str("path", turl).Str("method",os.Getenv("HEALTH_METHOD")).Msg("chk")
+	log.Info().Str("path", turl).Str("method", os.Getenv("HEALTH_METHOD")).Msg("chk")
 	timeout, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_PERIOD_SECONDS"))
 	req.SetTimeout(time.Duration(timeout) * time.Second)
 	switch os.Getenv("HEALTH_METHOD") {
@@ -273,40 +274,43 @@ func check() {
 			kill()
 		}
 	default:
-	
+
 	}
 }
+
 // https://pracucci.com/graceful-shutdown-of-kubernetes-pods.html
 func kill() {
 	log.Info().Str("timeout", os.Getenv("HEALTH_TYPE_PERIOD_SECONDS")).Send()
 	syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 }
 
-func (h *headers) getFromEnv() {
+func getHeaders() headers {
+	h := headers{}
 	for _, e := range os.Environ() {
 		pair := strings.Split(e, "=")
-		matched,_:= regexp.MatchString("TRS_HEADER_KEY", pair[0])
+		matched, _ := regexp.MatchString("TRS_HEADER_KEY", pair[0])
 		if matched {
-			v := strings.Replace(pair[0], "TRS_HEADER_KEY", "TRS_HEADER_VALUE", 1)
+			vn := strings.Replace(pair[0], "TRS_HEADER_KEY", "TRS_HEADER_VALUE", 1)
+			v := os.Getenv(vn)
 			if v == "" {
 				log.Warn().
-					Str("env","header").
+					Str("env", "header").
 					Str("header key name", pair[0]).
-					Str("TRS_HEADER_VALUE", v).
 					Msg("found key but value env not exist.")
 			}
 			k := header{
-				key: pair[1]
-				value: os.Getenv(v)
+				key:   pair[1],
+				value: v,
 			}
+			h = append(h, k)
 		}
-		
 	}
+	return h
 }
 
 type headers []header
 
 type header struct {
-	key string
+	key   string
 	value string
 }
