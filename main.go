@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -27,11 +28,9 @@ func init() {
 	gotenv.Apply(strings.NewReader("LOG_LEVEL=1"))
 	gotenv.Apply(strings.NewReader("TIMEOUT_RESTART=false"))
 	gotenv.Apply(strings.NewReader("TRS_PATH=/healthz"))
-	gotenv.Apply(strings.NewReader("TRS_METHOD=get"))
-	gotenv.Apply(strings.NewReader("TRS_BODY_KEY="))
-	gotenv.Apply(strings.NewReader("TRS_BODY_VALUE="))
-	gotenv.Apply(strings.NewReader("TRS_HEADER_KEY="))
-	gotenv.Apply(strings.NewReader("TRS_HEADER_VALUE="))
+	gotenv.Apply(strings.NewReader("TRS_METHOD=post"))
+	// TODO json support only now
+	gotenv.Apply(strings.NewReader("TRS_BODY={\"message\":\"hello\"}"))
 	gotenv.Apply(strings.NewReader("TRS_TYPE_INIT_DELAOY_SECONDS=0"))
 	gotenv.Apply(strings.NewReader("TRS_TYPE_PERIOD_SECONDS=1"))
 }
@@ -275,6 +274,20 @@ func check() {
 		}
 	default:
 
+	}
+}
+
+func chkPost() {
+	body := os.Getenv("TRS_BODY")
+	var j map[string]interface{}
+	json.Unmarshal([]byte(body), &j)
+	tem, err := req.Post("https://rasa.dev.sktchatbot.co.kr/webhooks/rest/webhook", req.BodyJSON(&j))
+	if err != nil {
+		fmt.Println("err")
+		fmt.Println(err)
+	} else {
+		fmt.Println("res")
+		fmt.Println(tem.String())
 	}
 }
 
