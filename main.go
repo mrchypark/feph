@@ -23,7 +23,7 @@ func init() {
 	gotenv.Apply(strings.NewReader("FEPH_PORT=4000"))
 	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
-	gotenv.Apply(strings.NewReader("LOG_LEVEL=1"))
+	gotenv.Apply(strings.NewReader("FEPH_LOG_LEVEL=1"))
 	// set 0 means no restart.
 	gotenv.Apply(strings.NewReader("TIMEOUT_RESTART=0"))
 }
@@ -32,7 +32,7 @@ func main() {
 
 	version := "feph-v0.0.19-rc3"
 	checkDir := os.Getenv("CHECK_DIR")
-	switch os.Getenv("LOG_LEVEL") {
+	switch os.Getenv("FEPH_LOG_LEVEL") {
 	case "5":
 		zerolog.SetGlobalLevel(zerolog.PanicLevel)
 	case "4":
