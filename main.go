@@ -30,7 +30,7 @@ func init() {
 
 func main() {
 
-	version := "feph-v0.0.19-rc2"
+	version := "feph-v0.0.19-rc3"
 	checkDir := os.Getenv("CHECK_DIR")
 	switch os.Getenv("LOG_LEVEL") {
 	case "5":
