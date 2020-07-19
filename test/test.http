@@ -57,4 +57,4 @@ Content-Type: application/json
 }
 
 ### 
-GET http://localhost:4000/panic
+GET http://localhost:4000/time

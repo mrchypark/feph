@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -26,24 +24,13 @@ func init() {
 	gotenv.Apply(strings.NewReader("TARGET_PORT=5005"))
 	gotenv.Apply(strings.NewReader("CHECK_DIR=./"))
 	gotenv.Apply(strings.NewReader("LOG_LEVEL=1"))
-	gotenv.Apply(strings.NewReader("TIMEOUT_RESTART=false"))
-	gotenv.Apply(strings.NewReader("TRS_PATH=/healthz"))
-	gotenv.Apply(strings.NewReader("TRS_METHOD=post"))
-	// TODO json support only now
-	gotenv.Apply(strings.NewReader("TRS_BODY={\"message\":\"hello\"}"))
-	gotenv.Apply(strings.NewReader("TRS_TYPE_INIT_DELAOY_SECONDS=0"))
-	gotenv.Apply(strings.NewReader("TRS_TYPE_PERIOD_SECONDS=1"))
+	// set 0 means no restart.
+	gotenv.Apply(strings.NewReader("TIMEOUT_RESTART=0"))
 }
 
 func main() {
 
-	h, _ := strconv.ParseBool(os.Getenv("INNER_HEALTH"))
-	if h {
-		log.Info().Msg("health check run")
-		go healthz()
-	}
-
-	version := "feph-v0.0.17"
+	version := "feph-v0.0.19-rc2"
 	checkDir := os.Getenv("CHECK_DIR")
 	switch os.Getenv("LOG_LEVEL") {
 	case "5":
@@ -60,6 +47,12 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	case "-1":
 		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
+
+	proxyTimeout, _ := strconv.Atoi(os.Getenv("TIMEOUT_RESTART"))
+
+	if proxyTimeout >= 0 {
+		setKillTimeout(proxyTimeout)
 	}
 
 	app := fiber.New()
@@ -190,10 +183,15 @@ func proxys(c *fiber.Ctx) {
 
 func proxyGet(c *fiber.Ctx) {
 	target := c.Params("*")
+
 	ret, err := proxyOnly(target, c)
 	if err != nil {
-		c.Status(404).Send("Not Found : " + c.Method() + " /" + target)
-		info(c)
+		if strings.Contains(err.Error(), "context deadline exceeded") {
+			kill()
+		} else {
+			c.Status(404).Send("Not Found : " + c.Method() + " /" + target)
+			info(c)
+		}
 	} else if strings.Contains(ret.String(), "Cannot") {
 		c.Status(404).Send(ret.String())
 		info(c)
@@ -206,12 +204,15 @@ func proxyPost(c *fiber.Ctx) {
 	target := c.Params("*")
 	ret, err := proxyWithBody(target, c)
 	if err != nil {
-		c.Status(404).Send("Not Found : " + c.Method() + " /" + target)
-		info(c)
+		if strings.Contains(err.Error(), "context deadline exceeded") {
+			kill()
+		} else {
+			c.Status(404).Send("Not Found : " + c.Method() + " /" + target)
+			info(c)
+		}
 	} else if strings.Contains(ret.String(), "Cannot") {
 		c.Status(404).Send(ret.String())
 		info(c)
-
 	} else {
 		bodyReturn(ret, c)
 	}
@@ -240,90 +241,12 @@ func proxyWithBody(target string, c *fiber.Ctx) (*req.Resp, error) {
 	return r, err
 }
 
-func healthz() {
-	t, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_INIT_DELAOY_SECONDS"))
-	time.Sleep(time.Duration(t) * time.Second)
-	for true {
-		check()
-		t, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_PERIOD_SECONDS"))
-		time.Sleep(time.Duration(t) * time.Second)
-	}
-}
-
-// kubectl exec POD_NAME -c CONTAINER_NAME /sbin/killall5
-
-func check() {
-	turl := "http://localhost:" + os.Getenv("TARGET_PORT") + os.Getenv("HEALTH_PATH")
-	log.Info().Str("path", turl).Str("method", os.Getenv("HEALTH_METHOD")).Msg("chk")
-	timeout, _ := strconv.Atoi(os.Getenv("HEALTH_TYPE_PERIOD_SECONDS"))
+func setKillTimeout(timeout int) {
 	req.SetTimeout(time.Duration(timeout) * time.Second)
-	switch os.Getenv("HEALTH_METHOD") {
-	case "get":
-		tem, err := req.Get(turl)
-		if err != nil {
-			log.Info().Msg("kill")
-			kill()
-		}
-		log.Info().Str("path", turl).Str("return", tem.String()).Send()
-	case "post":
-		b := os.Getenv("HEALTH_BODY")
-		_, err := req.Post(turl, req.BodyJSON(&b))
-		if err != nil {
-			log.Info().Msg("kill")
-			kill()
-		}
-	default:
-
-	}
-}
-
-func chkPost() {
-	body := os.Getenv("TRS_BODY")
-	var j map[string]interface{}
-	json.Unmarshal([]byte(body), &j)
-	tem, err := req.Post("https://rasa.dev.sktchatbot.co.kr/webhooks/rest/webhook", req.BodyJSON(&j))
-	if err != nil {
-		fmt.Println("err")
-		fmt.Println(err)
-	} else {
-		fmt.Println("res")
-		fmt.Println(tem.String())
-	}
 }
 
 // https://pracucci.com/graceful-shutdown-of-kubernetes-pods.html
 func kill() {
-	log.Info().Str("timeout", os.Getenv("HEALTH_TYPE_PERIOD_SECONDS")).Send()
+	log.Info().Str("timeout", os.Getenv("TIMEOUT_RESTART")).Send()
 	syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
-}
-
-func getHeaders() headers {
-	h := headers{}
-	for _, e := range os.Environ() {
-		pair := strings.Split(e, "=")
-		matched, _ := regexp.MatchString("TRS_HEADER_KEY", pair[0])
-		if matched {
-			vn := strings.Replace(pair[0], "TRS_HEADER_KEY", "TRS_HEADER_VALUE", 1)
-			v := os.Getenv(vn)
-			if v == "" {
-				log.Warn().
-					Str("env", "header").
-					Str("header key name", pair[0]).
-					Msg("found key but value env not exist.")
-			}
-			k := header{
-				key:   pair[1],
-				value: v,
-			}
-			h = append(h, k)
-		}
-	}
-	return h
-}
-
-type headers []header
-
-type header struct {
-	key   string
-	value string
 }
